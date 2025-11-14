@@ -410,7 +410,7 @@ city_results %>%
     x = "City",
     y = "Estimated proportion unsolved (95% CI)"
   ) +
-  theme_minimal()
+  theme_minimal(base_size = 8)
 ```
 
 ![](HW5_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
