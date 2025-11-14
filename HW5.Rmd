@@ -13,7 +13,7 @@ library(broom)
 set.seed(123)  # to replicate the result
 ```
 
-# 1) single simulation：given n people，is there any same day birthday by two people? (TRUE=there is at least one pair)
+### 1) Single simulation (TRUE=there is at least one pair)
 
 ```{r}
 has_match_once <- function(n) {
@@ -24,14 +24,14 @@ has_match_once <- function(n) {
 }
 ```
 
-# 2) For n=2..50，Every n repeat 10000 times and estimate the probability
+### 2) For n=2..50，Every n repeat 10000 times and estimate the probability
 ```{r}
 ns <- 2:50
 n_trials <- 10000
 ```
 
 
-# 3) use replicate() + mean() to calculate every n's probability
+### 3) use replicate() + mean() to calculate every n's probability
 ```{r}
 prob_sim <- sapply(ns, function(n) {
   
@@ -41,7 +41,7 @@ prob_sim <- sapply(ns, function(n) {
 ```
 
 
-# 4) The probability that "no one has the same birthday".
+### 4) The probability that "no one has the same birthday".
 ```{r}
 prob_exact <- 1 - sapply(ns, function(n) {
   
@@ -52,7 +52,7 @@ prob_exact <- 1 - sapply(ns, function(n) {
 ```
 
 
-# 5) Create a dataframe for plot
+### 5) Create a dataframe for plot
 ```{r}
 df <- tibble(
   n     = ns,
@@ -61,7 +61,7 @@ df <- tibble(
 )
 ```
 
-# 6) Use ggplot to visualize the result
+### 6) Use ggplot to visualize the result
 ```{r}
 birthday_plot <-
 ggplot(df, aes(n, sim)) +
@@ -79,6 +79,8 @@ Make a plot showing the probability as a function of group size, and comment on 
 
 
 # Problem 2
+
+### 1) Create 5000 times of simulation
 ```{r}
 sim_one_mu <- function(mu, n = 30, sigma = 5, n_sim = 5000) {
   
@@ -95,9 +97,12 @@ sim_one_mu <- function(mu, n = 30, sigma = 5, n_sim = 5000) {
     bind_rows()
 }
 
+mus     <- 0:6
+results <- purrr::map_df(mus, sim_one_mu)
+
 ```
 
-
+### 2) Set up the data for the plot
 ```{r}
 power_df <- results %>%
   group_by(true_mu) %>%
@@ -113,7 +118,7 @@ mean_reject_df <- results %>%
   summarise(avg_mu_hat_reject = mean(mu_hat))
 ```
 
-# Plot proportion of times the null was rejected (power)
+### 3) Plot proportion of times the null was rejected (power)
 ```{r}
 power_df <- results %>%
   group_by(true_mu) %>%
@@ -128,11 +133,10 @@ ggplot(power_df, aes(x = true_mu, y = power)) +
     title = "Power Curve for One-Sample t-Test (n = 30, σ = 5)"
   ) +
   theme_minimal()
-
 ```
-Describe the association between effect size and power.
+It's easier to tell the difference when the effect size is bigger, which means it has more power.
 
-# Plot the true value of μ on the x axis. 
+### 4) Plot the true value of μ on the x axis. 
 ```{r}
 mean_mu_df <- results %>%
   group_by(true_mu) %>%
@@ -148,8 +152,9 @@ ggplot(mean_mu_df, aes(true_mu, avg_mu_hat)) +
   ) +
   theme_minimal()
 ```
-̂ 
-# Plot only in samples for which the null was rejected 
+The group mean μ is a fair way to guess what the real mean is.
+
+### 5) Plot only in samples for which the null was rejected 
 ```{r}
 mean_reject_df <- results %>%
   filter(p.value < 0.05) %>%
@@ -165,14 +170,13 @@ ggplot(mean_reject_df, aes(true_mu, avg_mu_hat_reject)) +
     title = "Mean of μ̂ Among Datasets Where H0 is Rejected"
   ) +
   theme_minimal()
-
 ```
 
-
+It is more likely for the conditional estimate μ reject∣reject H0 to be positive when power is low. People sometimes report or think about only the craziest predictions. This trend shows a problem called selection bias, statistical significance filtering, or the "winner's curse."
 
 # Problem 3
 
-# Load Data
+### 1) Load Data
 ```{r message = FALSE}
 h <- read_csv("homicide-data.csv")
 ```
@@ -194,7 +198,7 @@ For this project, unsolved killings have:
 "Open/No arrest"
 
 
-# Create city_state variable and define "unsolved" categories
+### 2) Create city_state variable and define "unsolved" categories
 ```{r}
 h <- h %>%
   mutate(city_state = paste(city, state, sep = "_"))
@@ -204,8 +208,8 @@ unsolved_levels <- c("Closed without arrest", "Open/No arrest")
 
 
 
-# Summarize within each city
-```{r}
+### 3) Summarize within each city
+```{r message = FALSE}
 city_summary <- h %>%
   mutate(unsolved = disposition %in% unsolved_levels) %>%
   group_by(city_state) %>%
@@ -213,11 +217,10 @@ city_summary <- h %>%
     total = n(),
     unsolved = sum(unsolved)
   )
-
-city_summary
+knitr::kable(city_summary)
 ```
 
-# Filter for Baltimore
+### 4) Filter for Baltimore
 ```{r}
 bal <- city_summary %>% filter(city_state == "Baltimore_MD")
 
@@ -232,12 +235,12 @@ bal_ci_upper <- bal_tidy$conf.high
 
 bal_tidy
 ```
-The projected percentage of unsolved killings in Baltimore, MD is `r baltimore_estimate$estimate`. 
-The 95% confidence interval is (`r baltimore_estimate$conf.low`, `r baltimore_estimate$conf.high`)
+The projected percentage of unsolved killings in Baltimore, MD is `r bal_tidy$estimate`. 
+The 95% confidence interval is (`r bal_tidy$conf.low`, `r bal_tidy$conf.high`)
 
 
 
-# Function to run prop.test for one row
+### 5) Function to run prop.test for one row
 ```{r}
 run_test <- function(unsolved, total) {
   
@@ -246,17 +249,17 @@ run_test <- function(unsolved, total) {
 }
 ```
 
-# Apply to ALL cities
+### 6) Apply to ALL cities
 ```{r}
 city_results <- city_summary %>%
   mutate(test = map2(unsolved, total, run_test)) %>%
   unnest(test) %>%
   select(city_state, total, unsolved, estimate, conf.low, conf.high)
 
-city_results
+knitr::kable(city_results)
 ```
 
-# Visualize the result
+### 7) Visualize the result
 ```{r}
 city_results %>%
   arrange(estimate) %>%
@@ -270,7 +273,7 @@ city_results %>%
     x = "City",
     y = "Estimated proportion unsolved (95% CI)"
   ) +
-  theme_minimal()
+  theme_minimal(base_size = 8)
 
 ```
 
