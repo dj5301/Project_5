@@ -4,20 +4,23 @@ output: github_document
 ---
 ```{r message = FALSE}
 library(tidyverse)
+library(broom)
 ```
 
-# --- Birthday Paradox Simulation (no leap year, birthdays ~ Uniform{1..365}) ---
+# Problem 1
 
 ```{r}
 set.seed(123)  # to replicate the result
 ```
 
-# 1) single simulation：given n people，is there any same day birthday by two people? TRUE=there is at least one pair
+# 1) single simulation：given n people，is there any same day birthday by two people? (TRUE=there is at least one pair)
 
 ```{r}
 has_match_once <- function(n) {
+  
   bdays <- sample.int(365, size = n, replace = TRUE)
   anyDuplicated(bdays) > 0
+  
 }
 ```
 
@@ -28,86 +31,89 @@ n_trials <- 10000
 ```
 
 
-# use replicate() + mean() to calculate every n's probability
+# 3) use replicate() + mean() to calculate every n's probability
 ```{r}
 prob_sim <- sapply(ns, function(n) {
+  
   mean(replicate(n_trials, has_match_once(n)))
+  
 })
 ```
 
 
-# 3) 可选：计算“精确理论值”用于对比（1 - 全不同的概率）
+# 4) The probability that "no one has the same birthday".
 ```{r}
 prob_exact <- 1 - sapply(ns, function(n) {
-  if (n > 365) return(0)              # 但这里最大到 50，不会触发
-  prod((365:(365 - n + 1)) / 365)     # 连乘：365/365 * 364/365 * ... * (365-n+1)/365
+  
+  if (n > 365) return(0)              
+  prod((365:(365 - n + 1)) / 365)    
+  
 })
 ```
 
 
-# 4) 画图（使用 base R 或 ggplot2，二选一）
-# --- base R 版本 ---
+# 5) Create a dataframe for plot
 ```{r}
-plot(ns, prob_sim, type = "b", pch = 19, las = 1,
-     xlab = "population n",
-     ylab = "At least two people has same birthday",
-     main = "birthday bias: estimate simulation vs theoritical value (All 365 days, Uniform distribution)")
-lines(ns, prob_exact, lwd = 2, lty = 2)      # 理论曲线
-legend("bottomright",
-       legend = c("simulate(10000times/dot)", "Theroatical value"),
-       pch = c(19, NA), lty = c(1, 2), lwd = c(1, 2), bty = "n")
+df <- tibble(
+  n     = ns,
+  sim   = prob_sim,
+  exact = prob_exact
+)
 ```
 
-
+# 6) Use ggplot to visualize the result
 ```{r}
-df <- data.frame(n = ns, sim = prob_sim, exact = prob_exact)
- ggplot(df, aes(n, sim)) +
+birthday_plot <-
+ggplot(df, aes(n, sim)) +
    geom_point() + geom_line() +
    geom_line(aes(y = exact), linetype = 2) +
    labs(x = "population n", y = "At least two people has same birthday",
-       title = "birthday bias: estimate simulation vs theoritical value (All 365 days, Uniform distribution)",
+       title = "Birthday Problem: estimate simulation vs theoritical value (All 365 days, Uniform distribution)",
         subtitle = paste0("replicated n ", n_trials, " times")) +
    theme_minimal(base_size = 12)
+
+birthday_plot
 ```
+Make a plot showing the probability as a function of group size, and comment on your results.
 
 
 
-
-
+# Problem 2
 ```{r}
-library(tidyverse)
-library(broom)
-
-set.seed(123)
-
-# --------------------------
-# Function: run simulation for a given mu
-# --------------------------
 sim_one_mu <- function(mu, n = 30, sigma = 5, n_sim = 5000) {
   
-  replicate(n_sim, {
-    x <- rnorm(n, mean = mu, sd = sigma)
+  replicate(n_sim, {         
+    x  <- rnorm(n, mean = mu, sd = sigma)   
     tt <- t.test(x, mu = 0)
-    broom::tidy(tt) %>%
-      mutate(
-        mu_hat = mean(x),
-        true_mu = mu
-      )
-  }, simplify = FALSE) %>% 
+
+    tibble(
+      mu_hat  = mean(x),
+      p.value = tt$p.value,
+      true_mu = mu
+    )
+  }, simplify = FALSE) |>
     bind_rows()
 }
 
-# --------------------------
-# Run simulations: mu = 0..6
-# --------------------------
-mus <- 0:6
-
-results <- map_df(mus, sim_one_mu)
-
-head(results)
-
 ```
 
+
+```{r}
+power_df <- results %>%
+  group_by(true_mu) %>%
+  summarise(power = mean(p.value < 0.05))
+
+mean_mu_df <- results %>%
+  group_by(true_mu) %>%
+  summarise(avg_mu_hat = mean(mu_hat))
+
+mean_reject_df <- results %>%
+  filter(p.value < 0.05) %>%
+  group_by(true_mu) %>%
+  summarise(avg_mu_hat_reject = mean(mu_hat))
+```
+
+# Plot proportion of times the null was rejected (power)
 ```{r}
 power_df <- results %>%
   group_by(true_mu) %>%
@@ -115,7 +121,7 @@ power_df <- results %>%
 
 ggplot(power_df, aes(x = true_mu, y = power)) +
   geom_line() +
-  geom_point(size = 3) +
+  geom_point(size = 1.8) +
   labs(
     x = "True μ",
     y = "Power (P reject H0)",
@@ -124,24 +130,26 @@ ggplot(power_df, aes(x = true_mu, y = power)) +
   theme_minimal()
 
 ```
+Describe the association between effect size and power.
 
+# Plot the true value of μ on the x axis. 
 ```{r}
 mean_mu_df <- results %>%
   group_by(true_mu) %>%
   summarise(avg_mu_hat = mean(mu_hat))
 
 ggplot(mean_mu_df, aes(true_mu, avg_mu_hat)) +
-  geom_point(size = 3) +
-  geom_line() +
+  geom_point(size = 1.8, color = "green") +
+  geom_line(color = "green") +
   labs(
     x = "True μ",
     y = "Average μ̂ (all samples)",
-    title = "Mean of μ̂ across all simulated datasets"
+    title = "Mean of μ̂ Accross All Simulated Datasets"
   ) +
   theme_minimal()
-
 ```
-
+̂ 
+# Plot only in samples for which the null was rejected 
 ```{r}
 mean_reject_df <- results %>%
   filter(p.value < 0.05) %>%
@@ -149,32 +157,55 @@ mean_reject_df <- results %>%
   summarise(avg_mu_hat_reject = mean(mu_hat))
 
 ggplot(mean_reject_df, aes(true_mu, avg_mu_hat_reject)) +
-  geom_point(size = 3, color = "red") +
+  geom_point(size = 1.8, color = "red") +
   geom_line(color = "red") +
   labs(
     x = "True μ",
     y = "Average μ̂ | H0 rejected",
-    title = "Mean of μ̂ among datasets where H0 is rejected"
+    title = "Mean of μ̂ Among Datasets Where H0 is Rejected"
   ) +
   theme_minimal()
 
 ```
 
-```{r}
-library(tidyverse)
-library(broom)
 
-# --- Load Data ---
+
+# Problem 3
+
+# Load Data
+```{r message = FALSE}
 h <- read_csv("homicide-data.csv")
+```
+One row per homicide case from 50 significant U.S. cities is in the raw dataset.
+Some major variables are:
 
-# Create city_state variable
+Variable Description 
+uid: Unique identification for each homicide case 
+reported_date: Homicide report date
+victim_last, victim_first: Name of victim
+victim_race, victim_age, victim_sex: Demographic data
+city, state: city and state of the homicide 
+lat, lon: Location of incident
+disposition: Case status (“Closed by arrest”, “Open/No arrest”, “Closed without arrest”).
+
+For this project, unsolved killings have:
+
+"Closed without arrest"
+"Open/No arrest"
+
+
+# Create city_state variable and define "unsolved" categories
+```{r}
 h <- h %>%
   mutate(city_state = paste(city, state, sep = "_"))
 
-# Define "unsolved" categories
 unsolved_levels <- c("Closed without arrest", "Open/No arrest")
+```
+
+
 
 # Summarize within each city
+```{r}
 city_summary <- h %>%
   mutate(unsolved = disposition %in% unsolved_levels) %>%
   group_by(city_state) %>%
@@ -184,12 +215,11 @@ city_summary <- h %>%
   )
 
 city_summary
-
 ```
 
-```{r}
 # Filter for Baltimore
-bal <- city_summary %>% filter(city_state == "Baltimore, MD")
+```{r}
+bal <- city_summary %>% filter(city_state == "Baltimore_MD")
 
 bal_test <- prop.test(bal$unsolved, bal$total)
 
@@ -201,25 +231,32 @@ bal_ci_lower <- bal_tidy$conf.low
 bal_ci_upper <- bal_tidy$conf.high
 
 bal_tidy
+```
+The projected percentage of unsolved killings in Baltimore, MD is `r baltimore_estimate$estimate`. 
+The 95% confidence interval is (`r baltimore_estimate$conf.low`, `r baltimore_estimate$conf.high`)
 
+
+
+# Function to run prop.test for one row
+```{r}
+run_test <- function(unsolved, total) {
+  
+  tidy(prop.test(unsolved, total))
+  
+}
 ```
 
-```{r}
-# Function to run prop.test for one row
-run_test <- function(unsolved, total) {
-  tidy(prop.test(unsolved, total))
-}
-
 # Apply to ALL cities
+```{r}
 city_results <- city_summary %>%
   mutate(test = map2(unsolved, total, run_test)) %>%
   unnest(test) %>%
   select(city_state, total, unsolved, estimate, conf.low, conf.high)
 
 city_results
-
 ```
 
+# Visualize the result
 ```{r}
 city_results %>%
   arrange(estimate) %>%
