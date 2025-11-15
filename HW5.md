@@ -55,11 +55,27 @@ prob_exact <- 1 - sapply(ns, function(n) {
 
 ``` r
 df <- tibble(
-  n     = ns,
-  sim   = prob_sim,
+  n = ns,
+  sim = prob_sim,
   exact = prob_exact
 )
+df
 ```
+
+    ## # A tibble: 49 × 3
+    ##        n    sim   exact
+    ##    <int>  <dbl>   <dbl>
+    ##  1     2 0.0033 0.00274
+    ##  2     3 0.0079 0.00820
+    ##  3     4 0.0158 0.0164 
+    ##  4     5 0.0248 0.0271 
+    ##  5     6 0.0387 0.0405 
+    ##  6     7 0.057  0.0562 
+    ##  7     8 0.0749 0.0743 
+    ##  8     9 0.0885 0.0946 
+    ##  9    10 0.116  0.117  
+    ## 10    11 0.140  0.141  
+    ## # ℹ 39 more rows
 
 ### 6) Use ggplot to visualize the result
 
@@ -76,9 +92,15 @@ ggplot(df, aes(n, sim)) +
 birthday_plot
 ```
 
-![](HW5_files/figure-gfm/unnamed-chunk-8-1.png)<!-- --> Make a plot
-showing the probability as a function of group size, and comment on your
-results.
+![](HW5_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+
+### Answer for question
+
+First, the chance that two people in a small group share the same
+birthday is very close to 0. Second, the chance goes up as n goes up and
+is greater than 0.5 when n is about 23. Lastly, the chance of sharing a
+birthday gets closer to 1 for groups of about 50 people, which means
+it’s very likely that at least two people share a birthday.
 
 # Problem 2
 
@@ -100,7 +122,7 @@ sim_one_mu <- function(mu, n = 30, sigma = 5, n_sim = 5000) {
     bind_rows()
 }
 
-mus     <- 0:6
+mus <- 0:6
 results <- purrr::map_df(mus, sim_one_mu)
 ```
 
@@ -141,7 +163,13 @@ ggplot(power_df, aes(x = true_mu, y = power)) +
 
 ![](HW5_files/figure-gfm/unnamed-chunk-11-1.png)<!-- --> It’s easier to
 tell the difference when the effect size is bigger, which means it has
-more power.
+more power.The power and impact size are positively correlated in the
+graph. The likelihood of rejecting the null hypothesis when it is
+incorrect grows in direct proportion to the effect magnitude. The reason
+for this is because when the effect size increases, the t-statistic also
+increases, further displacing the sample mean distribution from the null
+value. More rejections and a higher power are the outcomes of very large
+t-values.
 
 ### 4) Plot the true value of μ on the x axis.
 
@@ -185,17 +213,29 @@ ggplot(mean_reject_df, aes(true_mu, avg_mu_hat_reject)) +
 
 ![](HW5_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
-It is more likely for the conditional estimate μ reject∣reject H0 to be
-positive when power is low. People sometimes report or think about only
-the craziest predictions. This trend shows a problem called selection
-bias, statistical significance filtering, or the “winner’s curse.”
+### Answer for the question
+
+The actual underlying value of μ is not consistently matched by the
+average of the estimated averages across the simulations that reject H₀.
+This is due to selection effects, which are introduced when the
+computation is based on a filtered subset instead of all samples.
+
+Only samples with very high 𝜇̂ will provide a significant result when the
+real μ is modest, indicating insufficient statistical power.
+Consequently, the conditional mean of 𝜇̂ becomes inflated in an unnatural
+way.
+
+With an increase in the real ν and a stronger test, almost all samples
+result in the rejection of H₀. The distortion is reduced and the
+conditional average is brought closer to the actual ν when fewer extreme
+samples are required to meet the significance threshold in that case.
 
 # Problem 3
 
 ### 1) Load Data
 
 ``` r
-h <- read_csv("homicide-data.csv")
+homicide_data <- read_csv("homicide-data.csv")
 ```
 
 One row per homicide case from 50 significant U.S. cities is in the raw
@@ -215,7 +255,7 @@ For this project, unsolved killings have:
 ### 2) Create city_state variable and define “unsolved” categories
 
 ``` r
-h <- h %>%
+h <- homicide_data %>%
   mutate(city_state = paste(city, state, sep = "_"))
 
 unsolved_levels <- c("Closed without arrest", "Open/No arrest")
@@ -291,7 +331,8 @@ knitr::kable(city_summary)
 ### 4) Filter for Baltimore
 
 ``` r
-bal <- city_summary %>% filter(city_state == "Baltimore_MD")
+bal <- city_summary %>% 
+  filter(city_state == "Baltimore_MD")
 
 bal_test <- prop.test(bal$unsolved, bal$total)
 
@@ -302,13 +343,27 @@ bal_estimate <- bal_tidy$estimate
 bal_ci_lower <- bal_tidy$conf.low
 bal_ci_upper <- bal_tidy$conf.high
 
-bal_tidy
+bal_table <- tibble(
+  estimate = bal_tidy$estimate,
+  ci_lower = bal_tidy$conf.low,
+  ci_upper = bal_tidy$conf.high
+)
+
+
+knitr::kable(bal)
 ```
 
-    ## # A tibble: 1 × 8
-    ##   estimate statistic  p.value parameter conf.low conf.high method    alternative
-    ##      <dbl>     <dbl>    <dbl>     <int>    <dbl>     <dbl> <chr>     <chr>      
-    ## 1    0.646      239. 6.46e-54         1    0.628     0.663 1-sample… two.sided
+| city_state   | total | unsolved |
+|:-------------|------:|---------:|
+| Baltimore_MD |  2827 |     1825 |
+
+``` r
+knitr::kable(bal_table)
+```
+
+|  estimate |  ci_lower |  ci_upper |
+|----------:|----------:|----------:|
+| 0.6455607 | 0.6275625 | 0.6631599 |
 
 The projected percentage of unsolved killings in Baltimore, MD is
 0.6455607. The 95% confidence interval is (0.6275625, 0.6631599)
